@@ -1,133 +1,162 @@
 <template>
     <div class="sign-form">
-        <router-link :to="{ name: 'home' }" class="close close--white">
-            <span class="visually-hidden">Закрыть форму авторизации</span>
-        </router-link>
-        <div class="sign-form__title">
-            <h1 class="title title--small">Авторизуйтесь на сайте</h1>
+      <router-link :to="{ name: 'home' }" class="close close--white">
+        <span class="visually-hidden">Закрыть форму авторизации</span>
+      </router-link>
+      <div class="sign-form__title">
+        <h1 class="title title--small">Авторизуйтесь на сайте</h1>
+      </div>
+      <form method="post" @submit.prevent="login">
+        <div class="sign-form__input">
+          <label class="input">
+            <span>E-mail</span>
+            <input
+              v-model="email"
+              type="email"
+              name="email"
+              placeholder="example@mail.ru"
+            />
+          </label>
+          <div class="sign-form__input-error">
+            {{ validations.email.error }}
+          </div>
         </div>
-        <form action="#" method="post">
-            <div class="sign-form__input">
-                <label class="input">
-                    <span>E-mail</span>
-                    <input v-model="email" type="email" name="email" placeholder="example@mail.ru" />
-                </label>
-            </div>
-
-            <div class="sign-form__input">
-                <label class="input">
-                    <span>Пароль</span>
-                    <input v-model="password" type="password" name="pass" placeholder="***********" />
-                </label>
-            </div>
-            <button type="submit" class="button">Авторизоваться</button>
-        </form>
+  
+        <div class="sign-form__input">
+          <label class="input">
+            <span>Пароль</span>
+            <input
+              v-model="password"
+              type="password"
+              name="pass"
+              placeholder="***********"
+            />
+          </label>
+          <div class="sign-form__input-error">
+            {{ validations.password.error }}
+          </div>
+        </div>
+        <button type="submit" class="button">Авторизоваться</button>
+  
+        <div class="server-error">
+          {{ errorMessage }}
+        </div>
+      </form>
     </div>
-</template>
-
-<script setup>
-import { ref } from "vue";
-
-const email = ref("");
-const password = ref("");
-</script>
-
-<style lang="scss" scoped>
-@import "@/assets/scss/ds-system/ds.scss";
-@import "@/assets/scss/mixins/mixins.scss";
-
-.sign-form {
-  @include pf_center-all;
+  </template>
   
-  z-index: 10;
+  <script setup>
+  import { ref, watch } from "vue";
+  import { useAuthStore } from "@/stores/auth";
+  import { useRouter } from "vue-router";
+  import { clearValidationErrors, validateFields } from "@/common/validator";
   
-  display: block;
+  const authStore = useAuthStore();
+  const router = useRouter();
   
-  box-sizing: border-box;
-  width: 455px;
-  padding-top: 146px;
-  padding-right: 32px;
-  padding-bottom: 32px;
-  padding-left: 32px;
+  const resetValidations = () => {
+    return {
+      email: {
+        error: "",
+        rules: ["required", "email"],
+      },
+      password: {
+        error: "",
+        rules: ["required"],
+      },
+    };
+  };
   
-  background: $white url("@/assets/img/popup.svg") no-repeat center top;
-  box-shadow: $shadow-light;
+  const email = ref("");
+  const password = ref("");
+  const validations = ref(resetValidations());
+  const errorMessage = ref(null);
   
-  button {
-    margin: 0 auto;
-    padding: 16px 14px;
-  }
-}
-
-.sign-form__title {
-  margin-bottom: 24px;
+  const watchField = (field) => () => {
+    if (errorMessage.value) {
+      errorMessage.value = null;
+    }
   
-  text-align: center;
-}
-
-.sign-form__input {
-  margin-bottom: 16px;
-}
-
-.close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+    if (validations.value[field]?.error) {
+      clearValidationErrors(validations.value);
+    }
+  };
   
-  width: 25px;
-  height: 25px;
+  watch(email, watchField("email"));
+  watch(password, watchField("password"));
   
-  cursor: pointer;
-  transition: 0.3s;
-  text-decoration: none;
+  const login = async () => {
+    const isValid = validateFields(
+      { email: email.value, password: password.value },
+      validations.value
+    );
   
-  color: $black;
-  border-radius: 50%;
-  outline: none;
+    if (!isValid) {
+      return;
+    }
   
-  &::before,
-  &::after {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    
-    width: 25px;
-    height: 2px;
-    
-    content: "";
-    
-    border-radius: 2px;
-    background-color: $black;
-  }
+    const resMsg = await authStore.login({
+      email: email.value,
+      password: password.value,
+    });
   
-  &::before {
-    transform: translate(-50%, -50%) rotate(-45deg);
-  }
+    if (resMsg === "success") {
+      await authStore.whoami();
+      await router.push({ name: "home" });
+    } else {
+      errorMessage.value = resMsg;
+    }
+  };
+  </script>
   
-  &::after {
-    transform: translate(-50%, -50%) rotate(45deg);
-  }
+  <style lang="scss" scoped>
+  @import "@/assets/scss/ds-system/ds.scss";
+  @import "@/assets/scss/mixins/mixins.scss";
   
-  &:hover {
-    opacity: 0.8;
-  }
+  .sign-form {
+    @include pf_center-all;
   
-  &:active {
-    opacity: 0.5;
-  }
+    z-index: 10;
   
-  &:focus {
-    &::before,
-    &::after {
-      background-color: $orange-100;
+    display: block;
+  
+    box-sizing: border-box;
+    width: 455px;
+    padding-top: 146px;
+    padding-right: 32px;
+    padding-bottom: 32px;
+    padding-left: 32px;
+  
+    background: $white url("/api/public/img/popup.svg") no-repeat center top;
+    box-shadow: $shadow-light;
+  
+    button {
+      margin: 0 auto;
+      padding: 16px 14px;
     }
   }
-
-  &--white {
-    &::before,
-    &::after {
-      background-color: $white;
-    }
+  
+  .sign-form__title {
+    margin-bottom: 24px;
+  
+    text-align: center;
   }
-}
-</style>
+  
+  .sign-form__input {
+    margin-bottom: 16px;
+  }
+  
+  .sign-form__input-error,
+  .server-error {
+    height: 16px;
+    color: $red-800;
+  }
+  
+  .sign-form__input-error {
+    margin-top: 4px;
+  }
+  
+  .server-error {
+    margin-top: 20px;
+  }
+  </style>
